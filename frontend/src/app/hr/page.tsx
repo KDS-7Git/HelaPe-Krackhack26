@@ -167,7 +167,7 @@ export default function HRDashboard() {
                             <button
                                 onClick={() => {
                                     if (!monthSalary || parseFloat(monthSalary) <= 0) {
-                                        showToast('Please enter a valid Monthly Salary amount first', 'error');
+                                        showToast('Please enter a valid Total amount first', 'error');
                                         return;
                                     }
                                     handleApprove(monthSalary);
@@ -209,7 +209,7 @@ export default function HRDashboard() {
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-900 mb-2">Monthly Salary (HLUSD)</label>
+                                <label className="block text-sm font-medium text-gray-900 mb-2">Total Pay (HLUSD)</label>
                                 <input
                                     type="number"
                                     value={monthSalary}
