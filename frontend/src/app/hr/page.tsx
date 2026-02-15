@@ -158,11 +158,11 @@ export default function HRDashboard() {
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                             <button
-                                onClick={() => mint('1000')}
+                                onClick={() => mint('1000000')}
                                 disabled={isApprovePending}
                                 className="px-4 py-3 bg-white text-gray-900 hover:bg-gray-100 disabled:bg-gray-500 disabled:text-gray-300 rounded-lg font-semibold transition-all shadow-sm"
                             >
-                                Mint 1,000 HLUSD
+                                Mint 1,000,000 HLUSD
                             </button>
                             <button
                                 onClick={() => {
