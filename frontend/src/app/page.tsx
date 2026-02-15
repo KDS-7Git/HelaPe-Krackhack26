@@ -1,9 +1,19 @@
 'use client';
 
-import Link from 'next/link';
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Header } from '../components/Header';
 
 export default function Home() {
+  const router = useRouter();
+  const [loading, setLoading] = useState(false);
+
+  const handleNavigation = (path: string) => {
+    setLoading(true);
+    setTimeout(() => {
+      router.push(path);
+    }, 1000);
+  };
   return (
     <div className="min-h-screen bg-white">
       <Header />
@@ -26,18 +36,18 @@ export default function Home() {
           </p>
 
           <div className="flex justify-center gap-6">
-            <Link
-              href="/employee"
-              className="px-8 py-4 bg-black hover:bg-gray-800 text-white rounded-lg font-bold text-lg shadow-lg transition-all"
+            <div
+              onClick={() => handleNavigation('/employee')}
+              className="cursor-pointer px-8 py-4 bg-black hover:bg-gray-800 text-white rounded-lg font-bold text-lg shadow-lg transition-all"
             >
               Employee Dashboard
-            </Link>
-            <Link
-              href="/hr"
-              className="px-8 py-4 bg-white hover:bg-gray-100 text-black border-2 border-black rounded-lg font-bold text-lg shadow-lg transition-all"
+            </div>
+            <div
+              onClick={() => handleNavigation('/hr')}
+              className="cursor-pointer px-8 py-4 bg-white hover:bg-gray-100 text-black border-2 border-black rounded-lg font-bold text-lg shadow-lg transition-all"
             >
               Employer Dashboard
-            </Link>
+            </div>
           </div>
         </div>
 
@@ -124,6 +134,13 @@ export default function Home() {
           </p>
         </div>
       </main>
+
+      {/* Loading Overlay */}
+      {loading && (
+        <div className="fixed inset-0 z-50 bg-[#111] flex items-center justify-center">
+          <div className="loader"></div>
+        </div>
+      )}
     </div>
   );
 }

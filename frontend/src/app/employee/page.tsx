@@ -30,7 +30,7 @@ export default function EmployeeDashboard() {
 
     const showToast = (message: string, type: 'success' | 'error' | 'warning' = 'error') => {
         setToast({ message, type });
-        setTimeout(() => setToast(null), 3000);
+        setTimeout(() => setToast(null), 5000);
     };
     const payStreamAddress = process.env.NEXT_PUBLIC_PAYSTREAM_CONTRACT_ADDRESS || '';
     const hlusdTokenAddress = process.env.NEXT_PUBLIC_MOCK_TOKEN_ADDRESS || '';
@@ -261,9 +261,15 @@ export default function EmployeeDashboard() {
                                     <span className="text-gray-600">Total Salary</span>
                                     <span className="font-semibold text-gray-900">{parseFloat(totalSalary).toFixed(2)} HLUSD</span>
                                 </div>
-                                <div className="flex justify-between py-3 border-b border-gray-100">
-                                    <span className="text-gray-600">Vested Amount</span>
-                                    <span className="font-bold text-gray-900">{parseFloat(vestedVal).toFixed(2)} HLUSD</span>
+                                <div className="flex justify-between py-3 border-b border-gray-100 bg-gray-50 px-3 rounded">
+                                    <span className="text-gray-600 flex items-center gap-2">
+                                        Vested Amount
+                                        <span className="relative flex h-2 w-2">
+                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                                            <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                                        </span>
+                                    </span>
+                                    <span className="font-bold text-green-700">{parseFloat(vestedVal).toFixed(2)} HLUSD</span>
                                 </div>
                                 <div className="flex justify-between py-3 border-b border-gray-100">
                                     <span className="text-gray-600">Withdrawn</span>
@@ -298,7 +304,14 @@ export default function EmployeeDashboard() {
                                                 max={availableVal}
                                                 className="w-full px-4 py-3 border border-gray-600 rounded-lg bg-gray-800/50 text-white placeholder-gray-500 focus:ring-2 focus:ring-gray-500 outline-none transition-all"
                                             />
-                                            <p className="text-gray-400 text-sm mt-2">Available: {parseFloat(availableVal).toFixed(4)} HLUSD</p>
+                                            <p className="text-gray-400 text-sm mt-2 flex items-center gap-2">
+                                                <span>Available: {parseFloat(availableVal).toFixed(4)} HLUSD</span>
+                                                <span className="relative flex h-1.5 w-1.5">
+                                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                                                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-green-500"></span>
+                                                </span>
+                                                <span className="text-xs text-green-400">Live</span>
+                                            </p>
                                         </div>
                                         <div className="flex items-end">
                                             <button

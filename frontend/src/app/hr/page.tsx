@@ -15,6 +15,9 @@ export default function HRDashboard() {
     const [duration, setDuration] = useState('');
     const [startTime, setStartTime] = useState('');
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'warning' } | null>(null);
+    const [lastProcessedHash, setLastProcessedHash] = useState<string | null>(null);
+    const [lastApproveHash, setLastApproveHash] = useState<string | null>(null);
+    const [currentAction, setCurrentAction] = useState<'create' | 'pause' | 'resume' | 'cancel' | 'bonus' | null>(null);
 
     const showToast = (message: string, type: 'success' | 'error' | 'warning' = 'error') => {
         setToast({ message, type });
@@ -25,27 +28,42 @@ export default function HRDashboard() {
     const payStreamAddress = process.env.NEXT_PUBLIC_PAYSTREAM_CONTRACT_ADDRESS || '';
     const tokenAddress = process.env.NEXT_PUBLIC_MOCK_TOKEN_ADDRESS || '';
 
-    const { createStream, pauseStream, resumeStream, cancelStream, isPending: isStreamPending, isConfirmed: isStreamConfirmed } = usePayStream(payStreamAddress as `0x${string}`);
+    const { createStream, pauseStream, resumeStream, cancelStream, addBonusSpike, isPending: isStreamPending, isConfirmed: isStreamConfirmed, hash: streamHash } = usePayStream(payStreamAddress as `0x${string}`);
     const senderStreamsResult = useSenderStreams(payStreamAddress as `0x${string}`, connectedAddress);
-    const { approve, mint, isPending: isApprovePending, isConfirmed: isApproveConfirmed, balance, allowance, refetchBalance } = useToken(tokenAddress as `0x${string}`, payStreamAddress as `0x${string}`);
+    const { approve, mint, isPending: isApprovePending, isConfirmed: isApproveConfirmed, balance, allowance, refetchBalance, hash: approveHash } = useToken(tokenAddress as `0x${string}`, payStreamAddress as `0x${string}`);
 
     useEffect(() => {
-        if (isStreamConfirmed) {
-            showToast('Stream created successfully!', 'success');
-            setStreamId('');
-            setRecipientAddress('');
-            setMonthSalary('');
-            setDuration('');
-            setStartTime('');
+        if (isStreamConfirmed && streamHash && streamHash !== lastProcessedHash) {
+            const messages = {
+                create: 'Stream created successfully!',
+                pause: 'Stream paused successfully!',
+                resume: 'Stream resumed successfully!',
+                cancel: 'Stream cancelled successfully!',
+                bonus: 'Bonus added successfully!'
+            };
+            const message = currentAction ? messages[currentAction] : 'Action completed successfully!';
+            showToast(message, 'success');
+            
+            if (currentAction === 'create') {
+                setStreamId('');
+                setRecipientAddress('');
+                setMonthSalary('');
+                setDuration('');
+                setStartTime('');
+            }
+            
             senderStreamsResult.refetch();
+            setLastProcessedHash(streamHash);
+            setCurrentAction(null);
         }
-    }, [isStreamConfirmed, senderStreamsResult]);
+    }, [isStreamConfirmed, streamHash, lastProcessedHash, senderStreamsResult, currentAction]);
 
     useEffect(() => {
-        if (isApproveConfirmed) {
+        if (isApproveConfirmed && approveHash && approveHash !== lastApproveHash) {
             refetchBalance();
+            setLastApproveHash(approveHash);
         }
-    }, [isApproveConfirmed, refetchBalance]);
+    }, [isApproveConfirmed, approveHash, lastApproveHash, refetchBalance]);
 
     const handleCreateStream = () => {
         if (!streamId || !recipientAddress || !monthSalary || !duration) {
@@ -57,24 +75,25 @@ export default function HRDashboard() {
             const durationSeconds = BigInt(parseInt(duration) * 24 * 60 * 60);
             const ratePerSec = salaryBigInt / durationSeconds;
 
-            // Handle start time with 60-second buffer to avoid "start time in past" errors
+            // Handle start time with 10-second buffer to avoid "start time in past" errors
             let startTimestamp: bigint;
             if (startTime) {
                 const selectedTime = Math.floor(new Date(startTime).getTime() / 1000);
                 const currentTime = Math.floor(Date.now() / 1000);
 
-                // If selected time is within next 60 seconds, add buffer
-                if (selectedTime < currentTime + 60) {
-                    startTimestamp = BigInt(currentTime + 60);
-                    showToast('Start time adjusted to +60 seconds from now to avoid timing issues', 'warning');
+                // If selected time is within next 10 seconds, add buffer
+                if (selectedTime < currentTime + 10) {
+                    startTimestamp = BigInt(currentTime + 10);
+                    showToast('Start time adjusted to +10 seconds from now to avoid timing issues', 'warning');
                 } else {
                     startTimestamp = BigInt(selectedTime);
                 }
             } else {
-                // Default to current time + 60 seconds for safety
-                startTimestamp = BigInt(Math.floor(Date.now() / 1000) + 60);
+                // Default to current time + 10 seconds for safety
+                startTimestamp = BigInt(Math.floor(Date.now() / 1000) + 10);
             }
 
+            setCurrentAction('create');
             createStream(BigInt(streamId), recipientAddress, ratePerSec, salaryBigInt, startTimestamp);
             showToast('Creating stream...', 'success');
         } catch (e) {
@@ -243,7 +262,10 @@ export default function HRDashboard() {
                                         pauseStream={pauseStream}
                                         resumeStream={resumeStream}
                                         cancelStream={cancelStream}
+                                        addBonusSpike={addBonusSpike}
+                                        tokenAddress={tokenAddress as `0x${string}`}
                                         showToast={showToast}
+                                        setCurrentAction={setCurrentAction}
                                     />
                                 ))}
                             </div>
@@ -274,16 +296,71 @@ function StreamCard({
     pauseStream,
     resumeStream,
     cancelStream,
-    showToast
+    addBonusSpike,
+    tokenAddress,
+    showToast,
+    setCurrentAction
 }: {
     streamId: bigint;
     contractAddress: `0x${string}`;
     pauseStream: (id: bigint) => void;
     resumeStream: (id: bigint) => void;
     cancelStream: (id: bigint) => void;
+    addBonusSpike: (id: bigint, amount: bigint, reason: string) => void;
+    tokenAddress: `0x${string}`;
     showToast: (message: string, type: 'success' | 'error' | 'warning') => void;
+    setCurrentAction: (action: 'create' | 'pause' | 'resume' | 'cancel' | 'bonus' | null) => void;
 }) {
+    const [showBonusForm, setShowBonusForm] = useState(false);
+    const [bonusAmount, setBonusAmount] = useState('');
+    const [bonusReason, setBonusReason] = useState('');
+    const [bonusStep, setBonusStep] = useState<'input' | 'approved'>('input');
+    const [lastBonusApproveHash, setLastBonusApproveHash] = useState<string | null>(null);
     const { streamResult, vestedResult } = usePayStream(contractAddress, streamId);
+    const { approve, isConfirmed: isApproveConfirmed, hash: approveHash, allowance, refetchAllowance } = useToken(tokenAddress, contractAddress);
+
+    // Monitor approval confirmation for bonus
+    useEffect(() => {
+        if (isApproveConfirmed && approveHash && approveHash !== lastBonusApproveHash && bonusStep === 'input' && bonusAmount) {
+            setLastBonusApproveHash(approveHash);
+            refetchAllowance();
+            setBonusStep('approved');
+            showToast('Approval confirmed! Now add the bonus.', 'success');
+        }
+    }, [isApproveConfirmed, approveHash, lastBonusApproveHash, bonusStep, bonusAmount, refetchAllowance, showToast]);
+
+    const handleApproveBonus = () => {
+        if (!bonusAmount || parseFloat(bonusAmount) <= 0) {
+            showToast('Please enter a valid bonus amount', 'error');
+            return;
+        }
+        if (!bonusReason.trim()) {
+            showToast('Please provide a reason for the bonus', 'error');
+            return;
+        }
+        try {
+            const amount = parseEther(bonusAmount);
+            approve(amount);
+            showToast('Please confirm approval in wallet...', 'success');
+        } catch (e) {
+            showToast('Failed to approve bonus', 'error');
+        }
+    };
+
+    const handleAddBonus = () => {
+        try {
+            const amount = parseEther(bonusAmount);
+            setCurrentAction('bonus');
+            addBonusSpike(streamId, amount, bonusReason);
+            showToast('Adding bonus spike...', 'success');
+            setShowBonusForm(false);
+            setBonusAmount('');
+            setBonusReason('');
+            setBonusStep('input');
+        } catch (e) {
+            showToast('Failed to add bonus', 'error');
+        }
+    };
 
     if (!streamResult.data) {
         return (
@@ -329,46 +406,146 @@ function StreamCard({
                     <span className="text-gray-600">Total</span>
                     <span className="font-semibold text-gray-900">{formatAmount(stream.deposit)} HLUSD</span>
                 </div>
-                <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Vested</span>
-                    <span className="font-semibold text-gray-900">{vested ? formatAmount(vested) : '0.00'} HLUSD</span>
+                <div className="flex justify-between text-sm bg-green-50 py-2 px-3 rounded">
+                    <span className="text-gray-600 flex items-center gap-2">
+                        Vested
+                        <span className="relative flex h-1.5 w-1.5">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-green-500"></span>
+                        </span>
+                    </span>
+                    <span className="font-semibold text-green-700">{vested ? formatAmount(vested) : '0.00'} HLUSD</span>
                 </div>
             </div>
 
             {active && (
-                <div className="flex gap-2">
-                    {paused ? (
-                        <>
-                            <button
-                                onClick={() => { resumeStream(streamId); showToast('Resuming...', 'success'); }}
-                                className="flex-1 px-3 py-2 bg-gray-700 hover:bg-gray-800 text-white rounded-lg text-sm font-medium transition-all"
-                            >
-                                Resume
-                            </button>
-                            <button
-                                onClick={() => { cancelStream(streamId); showToast('Cancelling...', 'success'); }}
-                                className="flex-1 px-3 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg text-sm font-medium transition-all"
-                            >
-                                Stop
-                            </button>
-                        </>
-                    ) : (
-                        <>
-                            <button
-                                onClick={() => { pauseStream(streamId); showToast('Pausing...', 'success'); }}
-                                className="flex-1 px-3 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg text-sm font-medium transition-all"
-                            >
-                                Pause
-                            </button>
-                            <button
-                                onClick={() => { cancelStream(streamId); showToast('Cancelling...', 'success'); }}
-                                className="flex-1 px-3 py-2 bg-gray-700 hover:bg-gray-800 text-white rounded-lg text-sm font-medium transition-all"
-                            >
-                                Stop
-                            </button>
-                        </>
+                <>
+                    <div className="flex gap-2 mb-3">
+                        {paused ? (
+                            <>
+                                <button
+                                    onClick={() => { setCurrentAction('resume'); resumeStream(streamId); showToast('Resuming...', 'success'); }}
+                                    className="flex-1 px-3 py-2 bg-gray-700 hover:bg-gray-800 text-white rounded-lg text-sm font-medium transition-all"
+                                >
+                                    Resume
+                                </button>
+                                <button
+                                    onClick={() => { setCurrentAction('cancel'); cancelStream(streamId); showToast('Cancelling...', 'success'); }}
+                                    className="flex-1 px-3 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg text-sm font-medium transition-all"
+                                >
+                                    Stop
+                                </button>
+                            </>
+                        ) : (
+                            <>
+                                <button
+                                    onClick={() => { setCurrentAction('pause'); pauseStream(streamId); showToast('Pausing...', 'success'); }}
+                                    className="flex-1 px-3 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg text-sm font-medium transition-all"
+                                >
+                                    Pause
+                                </button>
+                                <button
+                                    onClick={() => { setCurrentAction('cancel'); cancelStream(streamId); showToast('Cancelling...', 'success'); }}
+                                    className="flex-1 px-3 py-2 bg-gray-700 hover:bg-gray-800 text-white rounded-lg text-sm font-medium transition-all"
+                                >
+                                    Stop
+                                </button>
+                            </>
+                        )}
+                    </div>
+                    <button
+                        onClick={() => setShowBonusForm(!showBonusForm)}
+                        className="w-full px-3 py-2 bg-gray-800 hover:bg-gray-900 text-white rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2"
+                    >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                        </svg>
+                        {showBonusForm ? 'Hide Bonus Form' : 'Add Performance Bonus'}
+                    </button>
+                    
+                    {showBonusForm && (
+                        <div className="mt-4 p-4 bg-gray-50 border border-gray-300 rounded-lg space-y-3">
+                            {bonusStep === 'input' && (
+                                <>
+                                    <div>
+                                        <label className="block text-xs font-medium text-gray-700 mb-1">Bonus Amount (HLUSD)</label>
+                                        <input
+                                            type="number"
+                                            value={bonusAmount}
+                                            onChange={(e) => setBonusAmount(e.target.value)}
+                                            placeholder="e.g., 5000"
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-400 outline-none text-gray-900"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-medium text-gray-700 mb-1">Reason</label>
+                                        <input
+                                            type="text"
+                                            value={bonusReason}
+                                            onChange={(e) => setBonusReason(e.target.value)}
+                                            placeholder="e.g., Q4 Performance Bonus"
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-400 outline-none text-gray-900"
+                                        />
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={handleApproveBonus}
+                                            className="flex-1 px-3 py-2 bg-gray-700 hover:bg-gray-800 text-white rounded-lg text-sm font-medium transition-all"
+                                        >
+                                            Step 1: Approve Tokens
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                setShowBonusForm(false);
+                                                setBonusAmount('');
+                                                setBonusReason('');
+                                                setBonusStep('input');
+                                            }}
+                                            className="px-3 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg text-sm font-medium transition-all"
+                                        >
+                                            Cancel
+                                        </button>
+                                    </div>
+                                </>
+                            )}
+                            {bonusStep === 'approved' && (
+                                <>
+                                    <div className="bg-gray-100 border border-gray-300 rounded-lg p-3">
+                                        <div className="flex items-center gap-2 text-gray-900 mb-2">
+                                            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                            </svg>
+                                            <span className="font-semibold text-sm">Tokens Approved!</span>
+                                        </div>
+                                        <p className="text-xs text-gray-700">
+                                            Bonus: <span className="font-semibold">{bonusAmount} HLUSD</span><br />
+                                            Reason: <span className="font-semibold">{bonusReason}</span>
+                                        </p>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={handleAddBonus}
+                                            className="flex-1 px-3 py-2 bg-gray-800 hover:bg-gray-900 text-white rounded-lg text-sm font-medium transition-all"
+                                        >
+                                            Step 2: Add Bonus
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                setShowBonusForm(false);
+                                                setBonusAmount('');
+                                                setBonusReason('');
+                                                setBonusStep('input');
+                                            }}
+                                            className="px-3 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg text-sm font-medium transition-all"
+                                        >
+                                            Cancel
+                                        </button>
+                                    </div>
+                                </>
+                            )}
+                        </div>
                     )}
-                </div>
+                </>
             )}
         </div>
     );

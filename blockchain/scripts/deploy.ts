@@ -31,15 +31,21 @@ async function main() {
     const MockHLUSD = await ethers.getContractFactory("MockHLUSD");
     const mockHLUSD = await MockHLUSD.deploy();
     await mockHLUSD.waitForDeployment();
-    console.log("MockHLUSD deployed to:", await mockHLUSD.getAddress());
+    const hlusdAddress = await mockHLUSD.getAddress();
+    console.log("MockHLUSD deployed to:", hlusdAddress);
 
     const txVault = deployer.address; // Use deployer as tax vault for now
 
     const PayStream = await ethers.getContractFactory("PayStream");
-    const payStream = await PayStream.deploy(await mockHLUSD.getAddress(), txVault);
+    const payStream = await PayStream.deploy(hlusdAddress, txVault);
     await payStream.waitForDeployment();
+    const payStreamAddress = await payStream.getAddress();
 
-    console.log("PayStream deployed to:", await payStream.getAddress());
+    console.log("PayStream deployed to:", payStreamAddress);
+    console.log("\n✅ Deployment Complete!");
+    console.log("\nUpdate your frontend/.env.local with:");
+    console.log(`NEXT_PUBLIC_PAYSTREAM_CONTRACT_ADDRESS=${payStreamAddress}`);
+    console.log(`NEXT_PUBLIC_MOCK_TOKEN_ADDRESS=${hlusdAddress}`);
 }
 
 main().catch((error) => {

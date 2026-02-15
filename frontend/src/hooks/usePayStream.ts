@@ -96,6 +96,17 @@ const PAYSTREAM_ABI = [
         outputs: [{ name: "", type: "bool" }],
         stateMutability: "view",
         type: "function",
+    },
+    {
+        inputs: [
+            { name: "streamId", type: "uint256" },
+            { name: "amount", type: "uint256" },
+            { name: "reason", type: "string" }
+        ],
+        name: "addBonusSpike",
+        outputs: [],
+        stateMutability: "nonpayable",
+        type: "function",
     }
 ] as const;
 
@@ -154,6 +165,15 @@ export function usePayStream(contractAddress: `0x${string}`, streamId?: bigint) 
         });
     };
 
+    const addBonusSpike = (id: bigint, amount: bigint, reason: string) => {
+        writeContract({
+            address: contractAddress,
+            abi: PAYSTREAM_ABI,
+            functionName: 'addBonusSpike',
+            args: [id, amount, reason],
+        });
+    };
+
     const streamResult = useReadContract({
         address: contractAddress,
         abi: PAYSTREAM_ABI,
@@ -162,6 +182,10 @@ export function usePayStream(contractAddress: `0x${string}`, streamId?: bigint) 
         query: {
             enabled: streamId !== undefined && !!contractAddress,
             refetchInterval: 1000, // Refetch every second to show increasing vested amount
+            staleTime: 0, // Always consider data stale to force refetch
+            gcTime: 0, // Don't cache
+            refetchOnWindowFocus: true,
+            refetchOnMount: true,
         }
     });
 
@@ -173,6 +197,10 @@ export function usePayStream(contractAddress: `0x${string}`, streamId?: bigint) 
         query: {
             enabled: streamId !== undefined && !!contractAddress,
             refetchInterval: 1000, // Refetch every second
+            staleTime: 0, // Always consider data stale to force refetch
+            gcTime: 0, // Don't cache
+            refetchOnWindowFocus: true,
+            refetchOnMount: true,
         }
     });
 
@@ -182,6 +210,7 @@ export function usePayStream(contractAddress: `0x${string}`, streamId?: bigint) 
         cancelStream,
         pauseStream,
         resumeStream,
+        addBonusSpike,
         streamResult,
         vestedResult,
         isPending,

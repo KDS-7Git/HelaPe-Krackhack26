@@ -69,11 +69,11 @@ export function MockRampService({ hlusdAmount, onClose, onSuccess }: RampService
                     <div className="flex items-center justify-between mb-4">
                         <div>
                             <p className="text-sm text-gray-600 mb-1">You're converting</p>
-                            <p className="text-3xl font-bold text-gray-900">{hlusdAmount} HLUSD</p>
+                            <p className="text-3xl font-bold text-gray-900">{hlusdAmount.slice(0,10)} HLUSD</p>
                         </div>
-                        <div className="w-12 h-12 bg-gray-700 rounded-full flex items-center justify-center">
+                        {/* <div className="w-12 h-12 bg-gray-700 rounded-full flex items-center justify-center">
                             <span className="text-white font-bold">HL</span>
-                        </div>
+                        </div> */}
                     </div>
                     
                     <div className="flex items-center justify-center my-3">

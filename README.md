@@ -103,7 +103,7 @@ The PayStream contract includes an automatic 10% tax deduction system:
 - Tax calculations are transparent and shown in withdrawal confirmations
 
 ### Yield Earning 💰
-**PayStreamEnhanced** contract includes yield accrual functionality:
+PayStream includes yield accrual functionality:
 - Unwithdawn salary earns **5% APY** while sitting in the vault
 - Yield is calculated using simple interest on the remaining balance
 - Automatically accrued on every withdrawal
@@ -141,28 +141,25 @@ npx hardhat test
 
 All 13 tests passing ✅
 
-## Smart Contract Architecture
+## Smart Contract
 
-### PayStream.sol (Production)
-Basic streaming with tax module:
+**PayStream.sol** - Production contract with all features:
 - Real-time salary streaming
 - 10% automatic tax deduction
-- Pause/resume functionality
-- Stream cancellation with refunds
-
-### PayStreamEnhanced.sol (Advanced)
-Extended features:
-- All PayStream.sol features
-- 5% APY yield earning
+- 5% APY yield earning on unwithdawn balance
 - Performance bonus spikes
-- Enhanced balance tracking
-- Yield calculation on withdrawal
+- Pause/resume functionality (allows withdrawal of vested amounts even when paused)
+- Stream cancellation with refunds (employees can withdraw vested amounts after cancellation)
+
+**Deployed on HeLa Testnet:**
+- PayStream: `0x08f770Cf65BA21BeC00859F83fc0036184E02997`
+- MockHLUSD: `0xD0d869eB35b2Bf5abE5683c17753de0505D929a8`
 
 ## Project Structure
 
 - `blockchain/` - Smart contracts built with Hardhat
-  - `contracts/PayStream.sol` - Production contract with tax module
-  - `contracts/PayStreamEnhanced.sol` - Advanced contract with yield & bonuses
+  - `contracts/PayStream.sol` - Enhanced production contract with tax, yield & bonuses
+  - `contracts/PayStream.sol.old` - Original basic version (archived)
   - `test/PayStream.test.ts` - Comprehensive test suite
 - `frontend/` - Next.js frontend application
   - `src/app/employee/` - Employee dashboard
