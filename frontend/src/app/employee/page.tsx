@@ -5,6 +5,7 @@ import { usePayStream } from '../../hooks/usePayStream';
 import { useAccount } from 'wagmi';
 import { decodeEventLog, formatEther, parseEther } from 'viem';
 import { Header } from '../../components/Header';
+import { MockRampService } from '../../components/MockRampService';
 
 const WITHDRAWN_EVENT_ABI = [
     {
@@ -24,12 +25,37 @@ export default function EmployeeDashboard() {
     const [withdrawAmount, setWithdrawAmount] = useState('');
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'warning' } | null>(null);
     const [lastNotifiedHash, setLastNotifiedHash] = useState<`0x${string}` | null>(null);
+    const [showRampService, setShowRampService] = useState(false);
+    const [rampAmount, setRampAmount] = useState('0');
 
     const showToast = (message: string, type: 'success' | 'error' | 'warning' = 'error') => {
         setToast({ message, type });
         setTimeout(() => setToast(null), 3000);
     };
     const payStreamAddress = process.env.NEXT_PUBLIC_PAYSTREAM_CONTRACT_ADDRESS || '';
+    const hlusdTokenAddress = process.env.NEXT_PUBLIC_MOCK_TOKEN_ADDRESS || '';
+
+    const addTokenToMetaMask = async () => {
+        try {
+            const wasAdded = await (window as any).ethereum.request({
+                method: 'wallet_watchAsset',
+                params: {
+                    type: 'ERC20',
+                    options: {
+                        address: hlusdTokenAddress,
+                        symbol: 'HLUSD',
+                        decimals: 18,
+                        image: '',
+                    },
+                },
+            });
+            if (wasAdded) {
+                showToast('HLUSD token added to MetaMask!', 'success');
+            }
+        } catch (error) {
+            showToast('Failed to add token to MetaMask', 'error');
+        }
+    };
 
     const { address: connectedAddress, isConnected } = useAccount();
     const { vestedResult, streamResult, withdraw, isPending, hash, error, isConfirmed, receipt } = usePayStream(payStreamAddress as `0x${string}`, streamId ? BigInt(streamId) : undefined);
@@ -88,11 +114,15 @@ export default function EmployeeDashboard() {
         setLastNotifiedHash(hash);
     }, [isConfirmed, hash, receipt, payStreamAddress, lastNotifiedHash]);
 
-    const vestedVal = vestedResult.data ? formatEther(vestedResult.data as bigint) : '0';
-    const availableVal = vestedVal;
+    const vestedWei = vestedResult.data ? (vestedResult.data as bigint) : 0n;
     const streamData = streamResult.data as any;
-    const totalSalary = streamData?.deposit ? formatEther(streamData.deposit as bigint) : '0';
-    const withdrawn = streamData?.withdrawn ? formatEther(streamData.withdrawn as bigint) : '0';
+    const totalSalaryWei = streamData?.deposit ? (streamData.deposit as bigint) : 0n;
+    const withdrawnWei = streamData?.withdrawn ? (streamData.withdrawn as bigint) : 0n;
+    const availableWei = vestedWei > withdrawnWei ? vestedWei - withdrawnWei : 0n;
+    const vestedVal = formatEther(vestedWei);
+    const totalSalary = formatEther(totalSalaryWei);
+    const withdrawn = formatEther(withdrawnWei);
+    const availableVal = formatEther(availableWei);
     const ratePerSecond = streamData?.ratePerSecond ? formatEther(streamData.ratePerSecond as bigint) : '0';
 
     const handleWithdraw = () => {
@@ -171,7 +201,7 @@ export default function EmployeeDashboard() {
                                 <div className="hidden lg:block">
                                     <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6 text-right">
                                         <p className="text-gray-400 text-sm mb-2">Available Balance</p>
-                                        <p className="text-3xl font-bold">{parseFloat(vestedVal).toFixed(2)}</p>
+                                        <p className="text-3xl font-bold">{parseFloat(availableVal).toFixed(2)}</p>
                                         <p className="text-gray-400 text-sm mt-1">HLUSD</p>
                                     </div>
                                 </div>
@@ -283,7 +313,40 @@ export default function EmployeeDashboard() {
                                     {hash && (
                                         <p className="text-gray-400 text-sm mt-4 font-mono">Transaction: {hash.substring(0, 10)}...{hash.substring(hash.length - 8)}</p>
                                     )}
-                                </div>
+                                    <div className="mt-6 bg-gray-900/50 border border-gray-600 rounded-lg p-5">
+                                        <div className="flex items-start space-x-3 mb-4">
+                                            <svg className="w-6 h-6 text-gray-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                            </svg>
+                                            <div className="text-gray-300 text-sm flex-1">
+                                                <p className="font-bold text-white mb-2">HLUSD is an ERC20 Token</p>
+                                                <p className="mb-2">Withdrawn funds are automatically sent to your wallet, but <span className="font-semibold text-white">you need to add the HLUSD token to MetaMask</span> to see your balance.</p>
+                                                <p className="text-gray-400 text-xs">Token Address: {hlusdTokenAddress.substring(0, 6)}...{hlusdTokenAddress.substring(38)}</p>
+                                            </div>
+                                        </div>
+                                        <button
+                                            onClick={addTokenToMetaMask}
+                                            className="w-full px-4 py-2.5 bg-gray-600 hover:bg-gray-500 text-white rounded-lg font-semibold text-sm transition-all shadow-md hover:shadow-lg flex items-center justify-center space-x-2"
+                                        >
+                                            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                                                <path d="M12 4v16m8-8H4"/>
+                                            </svg>
+                                            <span>Add HLUSD to Wallet</span>
+                                        </button>
+                                    </div>                                    <div className="mt-4 pt-4 border-t border-gray-700">
+                                        <button
+                                            onClick={() => {
+                                                setRampAmount(availableVal);
+                                                setShowRampService(true);
+                                            }}
+                                            className="w-full px-4 py-2.5 bg-gray-800 hover:bg-gray-700 text-white rounded-lg font-semibold text-sm transition-all flex items-center justify-center space-x-2 border border-gray-600"
+                                        >
+                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                            </svg>
+                                            <span>Convert HLUSD to your Currency</span>
+                                        </button>
+                                    </div>                                </div>
                             </div>
                         ) : (
                             <div className="mb-8">
@@ -316,6 +379,18 @@ export default function EmployeeDashboard() {
                     <p>Powered by Smart Contracts on HeLa Testnet</p>
                 </div>
             </main>
+
+            {/* Ramp Service Modal */}
+            {showRampService && (
+                <MockRampService
+                    hlusdAmount={rampAmount}
+                    onClose={() => setShowRampService(false)}
+                    onSuccess={(txId) => {
+                        showToast(`Conversion successful! Transaction ID: ${txId}`, 'success');
+                        setShowRampService(false);
+                    }}
+                />
+            )}
         </div>
     );
 }

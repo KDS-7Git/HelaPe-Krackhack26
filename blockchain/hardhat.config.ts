@@ -9,7 +9,16 @@ const HELA_RPC_URL = process.env.HELA_RPC_URL || "https://testnet-rpc.helachain.
 const PRIVATE_KEY = process.env.PRIVATE_KEY;
 
 const config: HardhatUserConfig = {
-    solidity: "0.8.24",
+    solidity: {
+        version: "0.8.24",
+        settings: {
+            optimizer: {
+                enabled: true,
+                runs: 200,
+            },
+            viaIR: true,
+        },
+    },
     networks: {
         hela: {
             url: HELA_RPC_URL,
