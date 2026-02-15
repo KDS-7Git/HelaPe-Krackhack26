@@ -3,13 +3,27 @@
 import { useState, useEffect } from 'react';
 import { usePayStream } from '../../hooks/usePayStream';
 import { useAccount } from 'wagmi';
-import { formatEther, parseEther } from 'viem';
+import { decodeEventLog, formatEther, parseEther } from 'viem';
 import { Header } from '../../components/Header';
+
+const WITHDRAWN_EVENT_ABI = [
+    {
+        type: 'event',
+        name: 'Withdrawn',
+        inputs: [
+            { indexed: true, name: 'streamId', type: 'uint256' },
+            { indexed: true, name: 'recipient', type: 'address' },
+            { indexed: false, name: 'amount', type: 'uint256' },
+            { indexed: false, name: 'tax', type: 'uint256' },
+        ],
+    },
+] as const;
 
 export default function EmployeeDashboard() {
     const [streamId, setStreamId] = useState('');
     const [withdrawAmount, setWithdrawAmount] = useState('');
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'warning' } | null>(null);
+    const [lastNotifiedHash, setLastNotifiedHash] = useState<`0x${string}` | null>(null);
 
     const showToast = (message: string, type: 'success' | 'error' | 'warning' = 'error') => {
         setToast({ message, type });
@@ -18,7 +32,7 @@ export default function EmployeeDashboard() {
     const payStreamAddress = process.env.NEXT_PUBLIC_PAYSTREAM_CONTRACT_ADDRESS || '';
 
     const { address: connectedAddress, isConnected } = useAccount();
-    const { vestedResult, streamResult, withdraw, isPending, hash, error, isConfirmed } = usePayStream(payStreamAddress as `0x${string}`, streamId ? BigInt(streamId) : undefined);
+    const { vestedResult, streamResult, withdraw, isPending, hash, error, isConfirmed, receipt } = usePayStream(payStreamAddress as `0x${string}`, streamId ? BigInt(streamId) : undefined);
 
     useEffect(() => {
         if (isConfirmed) {
@@ -26,6 +40,53 @@ export default function EmployeeDashboard() {
             streamResult.refetch();
         }
     }, [isConfirmed, vestedResult, streamResult]);
+
+    useEffect(() => {
+        if (!isConfirmed || !hash || !receipt || lastNotifiedHash === hash) {
+            return;
+        }
+
+        const targetAddress = payStreamAddress.toLowerCase();
+        for (const log of receipt.logs) {
+            if (!log.address || log.address.toLowerCase() !== targetAddress) {
+                continue;
+            }
+
+            try {
+                const decoded = decodeEventLog({
+                    abi: WITHDRAWN_EVENT_ABI,
+                    data: log.data,
+                    topics: log.topics,
+                });
+
+                if (decoded.eventName !== 'Withdrawn') {
+                    continue;
+                }
+
+                const amount = decoded.args.amount as bigint;
+                const tax = decoded.args.tax as bigint;
+                const gross = amount + tax;
+                const grossValue = Number(formatEther(gross));
+                const taxValue = Number(formatEther(tax));
+                const netValue = Number(formatEther(amount));
+                const taxPercent = gross > 0n ? (taxValue / grossValue) * 100 : 0;
+                const netPercent = gross > 0n ? 100 - taxPercent : 0;
+
+                showToast(
+                    `Amount withdrawn: ${grossValue.toFixed(4)} HLUSD\n` +
+                    `Tax: ${taxValue.toFixed(4)} HLUSD (${taxPercent.toFixed(2)}%)\n` +
+                    `Net amount received: ${netValue.toFixed(4)} HLUSD (${netPercent.toFixed(2)}%)`,
+                    'success'
+                );
+                setLastNotifiedHash(hash);
+                return;
+            } catch {
+                // Ignore non-matching logs
+            }
+        }
+
+        setLastNotifiedHash(hash);
+    }, [isConfirmed, hash, receipt, payStreamAddress, lastNotifiedHash]);
 
     const vestedVal = vestedResult.data ? formatEther(vestedResult.data as bigint) : '0';
     const availableVal = vestedVal;
@@ -87,7 +148,7 @@ export default function EmployeeDashboard() {
             <main className="max-w-6xl mx-auto p-6 lg:p-8">
                 {/* Toast */}
                 {toast && (
-                    <div className={`fixed top-20 right-6 px-6 py-4 rounded-lg shadow-lg z-50 backdrop-blur-sm ${toast.type === 'error' ? 'bg-red-50/90 border border-red-200 text-red-800' :
+                    <div className={`fixed top-20 right-6 px-6 py-4 rounded-lg shadow-lg z-50 backdrop-blur-sm whitespace-pre-line ${toast.type === 'error' ? 'bg-red-50/90 border border-red-200 text-red-800' :
                         toast.type === 'warning' ? 'bg-yellow-50/90 border border-yellow-200 text-yellow-800' :
                             'bg-green-50/90 border border-green-200 text-green-800'
                         }`}>

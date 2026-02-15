@@ -101,7 +101,7 @@ const PAYSTREAM_ABI = [
 
 export function usePayStream(contractAddress: `0x${string}`, streamId?: bigint) {
     const { writeContract, data: hash, isPending, error } = useWriteContract();
-    const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash });
+    const { data: receipt, isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash });
 
     const createStream = (streamId: bigint, recipient: string, ratePerSecond: bigint, deposit: bigint, startTime: bigint) => {
         writeContract({
@@ -187,6 +187,7 @@ export function usePayStream(contractAddress: `0x${string}`, streamId?: bigint) 
         isPending,
         isConfirming,
         isConfirmed,
+        receipt,
         error,
         hash,
     };
