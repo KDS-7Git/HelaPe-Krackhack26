@@ -106,3 +106,10 @@ The web application will be available at `http://localhost:3000`
   - `src/components/MockRampService.tsx` - Fiat conversion demo
 
 
+## Team
+
+- KRISHNA DHAKAL(@KDS-7Git)
+- ADITYA KUMAR CHANDEL(@Aditya-Chandel108)  
+- SHREEKAR KADAM (@iashrkr23)
+
+
